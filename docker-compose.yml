@@ -64,7 +64,7 @@ services:
     networks:
       - etcd_net
     ports:
-      - "5180:8080"
+      - "10080:8080"
     depends_on:
       - etcd1
       - etcd2
@@ -73,8 +73,3 @@ services:
 networks:
   etcd_net:
     driver: bridge
-
-# volumes:
-#   etcd1-data:
-#   etcd2-data:
-#   etcd3-data:
