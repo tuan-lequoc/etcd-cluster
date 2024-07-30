@@ -1,0 +1,48 @@
+# Use an appropriate base image for Go that supports ARM64
+FROM golang:1.12 as build
+
+# Set Go environment variables
+ENV GO111MODULE=on
+ENV GOPROXY="https://goproxy.io"
+ENV GOARCH=arm64
+ENV GOOS=linux
+
+# Set the working directory inside the container
+WORKDIR /opt
+RUN mkdir etcdkeeper
+
+# Copy the source code into the container
+ADD . /opt/etcdkeeper
+WORKDIR /opt/etcdkeeper/src/etcdkeeper
+
+# Download Go modules and build the etcdkeeper binary for ARM64
+RUN go mod download \
+    && CGO_ENABLED=0 GOARCH=arm64 GOOS=linux go build -a -o etcdkeeper.bin main.go
+
+# Use a minimal image for the final container
+FROM arm64v8/alpine:3.10
+
+# Install bash and ldd for checking dependencies
+RUN apk add --no-cache bash libc6-compat
+
+# Set environment variables
+ENV HOST="0.0.0.0"
+ENV PORT="8080"
+
+# Ensure the binary is executable and libraries are linked correctly
+RUN mkdir /lib64 && ln -s /lib/ld-musl-aarch64.so.1 /lib64/ld-linux-aarch64.so.1
+
+# Set the working directory inside the container
+WORKDIR /opt/etcdkeeper
+
+# Copy the binary from the build stage
+COPY --from=build /opt/etcdkeeper/src/etcdkeeper/etcdkeeper.bin .
+
+# Copy the assets
+ADD assets assets
+
+# Expose the port etcdkeeper runs on
+EXPOSE ${PORT}
+
+# Run the etcdkeeper binary
+ENTRYPOINT ["/bin/bash", "-c", "./etcdkeeper.bin -h ${HOST} -p ${PORT}"]
